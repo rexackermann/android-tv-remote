@@ -7,17 +7,47 @@ from config import cfg
 
 logger = logging.getLogger(__name__)
 
+class CustomAndroidTVRemote(AndroidTVRemote):
+    """
+    Subclass of AndroidTVRemote to capture text updates from the TV.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.on_text_updated_callback: Optional[Callable[[str], None]] = None
+
+    def _handle_message(self, raw_msg: bytes) -> None:
+        """Override to intercept IME messages."""
+        from androidtvremote2.remotemessage_pb2 import RemoteMessage
+        msg = RemoteMessage()
+        try:
+            msg.ParseFromString(raw_msg)
+        except Exception:
+            pass # Library handles parsing errors too
+        
+        if msg.HasField("remote_ime_batch_edit"):
+            # Extract text from the batch edit
+            for edit_info in msg.remote_ime_batch_edit.edit_info:
+                if edit_info.HasField("text_field_status"):
+                    text = edit_info.text_field_status.value
+                    logger.info(f"TV text update received: {text}")
+                    if self.on_text_updated_callback:
+                        self.on_text_updated_callback(text)
+        
+        # Call original handler to process other messages
+        super()._handle_message(raw_msg)
+
 class AndroidTVController:
     """
     Manages connection and control of an Android TV using the Android TV Remote Protocol v2.
     """
     
     def __init__(self):
-        self.client: Optional[AndroidTVRemote] = None
+        self.client: Optional[CustomAndroidTVRemote] = None
         self.ip_address: Optional[str] = None
         self.on_connect_callback: Optional[Callable] = None
         self.on_disconnect_callback: Optional[Callable] = None
         self.on_error_callback: Optional[Callable] = None
+        self.on_text_updated_callback: Optional[Callable[[str], None]] = None
         self.is_connected = False
         self.connection_lock = asyncio.Lock()
         
@@ -54,12 +84,13 @@ class AndroidTVController:
                         await self._disconnect_internal()
 
                     logger.info(f"Connection attempt {attempt} to {ip_address}...")
-                    self.client = AndroidTVRemote(
+                    self.client = CustomAndroidTVRemote(
                         client_name="Linux TV Remote",
                         certfile=self.cert_path,
                         keyfile=self.key_path,
                         host=ip_address
                     )
+                    self.client.on_text_updated_callback = self.on_text_updated_callback
                     
                     await self.client.async_generate_cert_if_missing()
                     

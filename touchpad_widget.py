@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal, QPointF
-from PyQt6.QtGui import QPainter, QBrush, QColor, QPen, QFont
+from PyQt6.QtGui import QPainter, QBrush, QColor, QPen, QFont, QLinearGradient
 import time
 
 class TouchpadWidget(QWidget):
@@ -30,19 +30,32 @@ class TouchpadWidget(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Draw background (Glassy/Dark)
-        painter.setBrush(QBrush(QColor("#1c2128")))
+        # Draw background (Premium Glassmorphism)
+        gradient = QLinearGradient(0, 0, 0, self.height())
+        gradient.setColorAt(0, QColor("#1c2128"))
+        gradient.setColorAt(1, QColor("#0d1117"))
+        
+        painter.setBrush(QBrush(gradient))
         painter.setPen(QPen(QColor("#30363d"), 1))
-        painter.drawRoundedRect(self.rect().adjusted(1,1,-1,-1), 12, 12)
+        painter.drawRoundedRect(self.rect().adjusted(1,1,-1,-1), 16, 16)
+        
+        # Subtle Inner Glow/Border
+        painter.setPen(QPen(QColor(255, 255, 255, 10), 1))
+        painter.drawRoundedRect(self.rect().adjusted(2,2,-2,-2), 14, 14)
         
         # Draw "Touchpad" label in center
         painter.setPen(QPen(QColor("#8b949e")))
         font = painter.font()
         font.setFamily("Inter")
-        font.setPointSize(11)
+        font.setPointSize(10)
         font.setWeight(QFont.Weight.Medium)
         painter.setFont(font)
-        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Touchpad Gestures\n(Swipe to Navigate, Tap to OK)")
+        
+        # Center text with slight transparency
+        painter.setOpacity(0.7)
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, 
+                         "TOUCHPAD\nSwipe to Navigate • Tap to OK")
+        painter.setOpacity(1.0)
 
     def mousePressEvent(self, event):
         self.last_pos = event.pos()

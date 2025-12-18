@@ -110,33 +110,35 @@ class AndroidTVRemoteApp(QMainWindow):
         remote_layout = QVBoxLayout(self.remote_tab)
         
         # D-pad Config
-        dpad_group = QGroupBox("Navigation")
-        dpad_layout = QVBoxLayout(dpad_group)
+        nav_group = QGroupBox("Navigation")
+        nav_layout = QVBoxLayout(nav_group)
         
         from PyQt6.QtWidgets import QGridLayout
-        nav_grid = QGridLayout()
+        dpad_grid = QGridLayout()
+        dpad_grid.setSpacing(10)
         
         btn_up = QPushButton("▲")
         btn_down = QPushButton("▼")
         btn_left = QPushButton("◀")
         btn_right = QPushButton("▶")
         btn_center = QPushButton("OK")
+        btn_center.setObjectName("btn_center")
         btn_center.setProperty("class", "accent")
         
         for btn in [btn_up, btn_down, btn_left, btn_right, btn_center]:
-            btn.setFixedSize(60, 60)
-            btn.setFont(QFont("Arial", 16))
+            btn.setFixedSize(65, 65)
+            btn.setFont(QFont("Inter", 16, QFont.Weight.Bold))
             
-        nav_grid.addWidget(btn_up, 0, 1)
-        nav_grid.addWidget(btn_left, 1, 0)
-        nav_grid.addWidget(btn_center, 1, 1)
-        nav_grid.addWidget(btn_right, 1, 2)
-        nav_grid.addWidget(btn_down, 2, 1)
+        dpad_grid.addWidget(btn_up, 0, 1)
+        dpad_grid.addWidget(btn_left, 1, 0)
+        dpad_grid.addWidget(btn_center, 1, 1)
+        dpad_grid.addWidget(btn_right, 1, 2)
+        dpad_grid.addWidget(btn_down, 2, 1)
         
         container = QWidget()
-        container.setLayout(nav_grid)
-        dpad_layout.addWidget(container, 0, Qt.AlignmentFlag.AlignCenter)
-        remote_layout.addWidget(dpad_group)
+        container.setLayout(dpad_grid)
+        nav_layout.addWidget(container, 0, Qt.AlignmentFlag.AlignCenter)
+        remote_layout.addWidget(nav_group)
         
         # Connect buttons
         btn_up.clicked.connect(lambda: self.tv_controller.send_key("DPAD_UP"))
@@ -257,18 +259,10 @@ class AndroidTVRemoteApp(QMainWindow):
         self.txt_input.setPlaceholderText("Type real-time to TV...")
         self.txt_input.textChanged.connect(self.on_realtime_text)
         self._last_text = "" # For tracking deltas
+        self._ignore_sync = False # To prevent feedback loops
         
-        btn_backspace = QPushButton("⌫")
-        btn_backspace.setFixedWidth(50)
-        btn_backspace.clicked.connect(lambda: self.tv_controller.send_key("DEL"))
-        
-        btn_clear_input = QPushButton("Clear")
-        btn_clear_input.setFixedWidth(60)
-        btn_clear_input.clicked.connect(self.clear_realtime_input)
-        
+        # UI Polish: buttons removed as requested
         input_sub.addWidget(self.txt_input)
-        input_sub.addWidget(btn_backspace)
-        input_sub.addWidget(btn_clear_input)
         feat_layout.addLayout(input_sub)
 
         extra_btn_layout = QHBoxLayout()
@@ -331,6 +325,18 @@ class AndroidTVRemoteApp(QMainWindow):
         self.tv_controller.on_connect_callback = self.handle_connected
         self.tv_controller.on_disconnect_callback = self.handle_disconnected
         self.tv_controller.on_error_callback = self.handle_error
+        self.tv_controller.on_text_updated_callback = self.handle_tv_text_update
+
+    def handle_tv_text_update(self, text):
+        """Update app input field when TV text changes."""
+        if text == self.txt_input.text():
+            return
+            
+        self._ignore_sync = True
+        self.txt_input.setText(text)
+        self._last_text = text
+        self._ignore_sync = False
+        self.update_status("Text synced from TV")
 
     # -- Device Discovery Logic --
     def on_device_found(self, device_info):
@@ -629,6 +635,9 @@ class AndroidTVRemoteApp(QMainWindow):
 
     # -- Keyboard --
     def on_realtime_text(self, text):
+        if self._ignore_sync:
+            return
+            
         # Delta-based text sending
         if len(text) > len(self._last_text):
             # Characters added
@@ -803,6 +812,11 @@ def main():
             font-weight: bold;
         }
         
+        QPushButton#btn_center {
+            border: 2px solid #58a6ff;
+            background: rgba(88, 166, 255, 0.1);
+        }
+        
         QPushButton#btn_power {
             background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #da3633, stop:1 #8e2a27);
             color: white;
@@ -814,8 +828,9 @@ def main():
             background: #0d1117;
             border: 1px solid #30363d;
             border-radius: 8px;
-            padding: 8px;
+            padding: 10px;
             color: #f0f0f0;
+            font-size: 15px;
             selection-background-color: #58a6ff;
         }
         
