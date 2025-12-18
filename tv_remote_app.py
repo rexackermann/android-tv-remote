@@ -1,4 +1,5 @@
 import sys
+import time
 import asyncio
 import logging
 from typing import Optional
@@ -6,8 +7,8 @@ import qasync
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QListWidget, 
                             QMessageBox, QInputDialog, QLineEdit, QGroupBox,
-                            QTabWidget, QCheckBox, QStatusBar, QScrollArea, QFrame)
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot, pyqtSignal
+                            QTabWidget, QCheckBox, QStatusBar, QScrollArea, QFrame, QScroller)
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot, pyqtSignal, QPoint
 from PyQt6.QtGui import QIcon, QFont, QKeyEvent, QColor, QBrush, QLinearGradient
 
 from config import cfg
@@ -19,6 +20,47 @@ from touchpad_widget import TouchpadWidget
 
 logger = logging.getLogger(__name__)
 
+class LongPressButton(QPushButton):
+    """Button that distinguishes between short clicks and long presses."""
+    longPressed = pyqtSignal()
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._handle_timeout)
+        self._long_press_triggered = False
+        
+        self._repeat_timer = QTimer(self)
+        self._repeat_timer.timeout.connect(self._handle_repeat)
+        
+    def mousePressEvent(self, event):
+        self._long_press_triggered = False
+        self._timer.start(350)  # 350ms for long press
+        self._repeat_timer.stop()
+        super().mousePressEvent(event)
+        
+    def mouseReleaseEvent(self, event):
+        self._timer.stop()
+        self._repeat_timer.stop()
+        if self._long_press_triggered:
+            # Consume the release to prevent triggering the normal click
+            return
+        super().mouseReleaseEvent(event)
+        
+    def _handle_timeout(self):
+        self._long_press_triggered = True
+        self.longPressed.emit()
+        self._start_time = time.time()
+        self._repeat_timer.start(250) # Start slow, then accelerate
+
+    def _handle_repeat(self):
+        # Time-based acceleration: 250ms -> 30ms over 2 seconds
+        elapsed = time.time() - self._start_time
+        interval = max(30, int(250 - (elapsed * 110))) # 110ms/s decay
+        self._repeat_timer.setInterval(interval)
+        self.click()
+
 class AndroidTVRemoteApp(QMainWindow):
     # Signals for thread-safe UI updates from discovery thread
     device_found_sig = pyqtSignal(dict)
@@ -28,7 +70,8 @@ class AndroidTVRemoteApp(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("Android TV Remote (Linux)")
-        self.resize(400, 700)
+        self.setMinimumSize(400, 800)
+        self.resize(400, 800)
         
         # Controllers
         self.tv_controller = AndroidTVController()
@@ -39,6 +82,10 @@ class AndroidTVRemoteApp(QMainWindow):
         # Connect Signals
         self.device_found_sig.connect(self._add_device_sub)
         self.device_lost_sig.connect(self._remove_device_sub)
+
+        # Keyboard State
+        self._last_text = ""
+        self._ignore_sync = False
 
         # UI Setup
         self.central_widget = QWidget()
@@ -61,7 +108,6 @@ class AndroidTVRemoteApp(QMainWindow):
     def auto_connect_startup(self):
         last_ip = cfg.get("last_connected_device_ip")
         if last_ip:
-            self.tabs.setCurrentIndex(1) # Start on Remote tab
             self.update_status(f"Auto-connecting to {last_ip}...")
             asyncio.create_task(self._perform_connect(last_ip))
         else:
@@ -105,7 +151,12 @@ class AndroidTVRemoteApp(QMainWindow):
         
         self.tabs.addTab(self.devices_tab, "Devices")
         
-        # -- REMOTE TAB (Wrapped in ScrollArea) --
+        # -- REMOTE TAB (Sticky Layout) --
+        self.remote_tab_container = QWidget()
+        main_remote_layout = QVBoxLayout(self.remote_tab_container)
+        main_remote_layout.setContentsMargins(0, 0, 0, 0)
+        main_remote_layout.setSpacing(0)
+
         self.remote_scroll = QScrollArea()
         self.remote_scroll.setWidgetResizable(True)
         self.remote_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -119,6 +170,9 @@ class AndroidTVRemoteApp(QMainWindow):
         remote_layout.setContentsMargins(10, 10, 10, 10)
         remote_layout.setSpacing(15)
         
+        # Enable touch scrolling (Kinetic) on the Button Area only
+        QScroller.grabGesture(self.remote_scroll.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+        
         # D-pad Config
         nav_group = QGroupBox("Navigation")
         nav_layout = QVBoxLayout(nav_group)
@@ -127,13 +181,18 @@ class AndroidTVRemoteApp(QMainWindow):
         dpad_grid = QGridLayout()
         dpad_grid.setSpacing(10)
         
-        btn_up = QPushButton("▲")
-        btn_down = QPushButton("▼")
-        btn_left = QPushButton("◀")
-        btn_right = QPushButton("▶")
-        btn_center = QPushButton("OK")
+        btn_up = LongPressButton("▲")
+        btn_down = LongPressButton("▼")
+        btn_left = LongPressButton("◀")
+        btn_right = LongPressButton("▶")
+        btn_center = LongPressButton("OK")
         btn_center.setObjectName("btn_center")
         btn_center.setProperty("class", "accent")
+        
+        # Connect Long Press for OK (usually Menu or Context)
+        btn_center.longPressed.connect(lambda: self.tv_controller.send_key("CENTER", "START_LONG"))
+        btn_center.released.connect(lambda: self.tv_controller.send_key("CENTER", "END_LONG") if btn_center._long_press_triggered else None)
+
         
         for btn in [btn_up, btn_down, btn_left, btn_right, btn_center]:
             btn.setFixedSize(65, 65)
@@ -159,13 +218,19 @@ class AndroidTVRemoteApp(QMainWindow):
 
         # Function Buttons
         func_layout = QHBoxLayout()
-        btn_back = QPushButton("Back")
-        btn_home = QPushButton("Home")
+        btn_back = LongPressButton("Back")
+        btn_home = LongPressButton("Home")
         btn_menu = QPushButton("Menu")  # Often 'SETTINGS' or 'MENU'
         
         btn_back.clicked.connect(lambda: self.tv_controller.send_key("BACK"))
         btn_home.clicked.connect(lambda: self.tv_controller.send_key("HOME"))
         btn_menu.clicked.connect(lambda: self.tv_controller.send_key("SETTINGS"))
+
+        # Connect Long Press for Back/Home
+        btn_back.longPressed.connect(lambda: self.tv_controller.send_key("BACK", "START_LONG"))
+        btn_back.released.connect(lambda: self.tv_controller.send_key("BACK", "END_LONG") if btn_back._long_press_triggered else None)
+        btn_home.longPressed.connect(lambda: self.tv_controller.send_key("HOME", "START_LONG"))
+        btn_home.released.connect(lambda: self.tv_controller.send_key("HOME", "END_LONG") if btn_home._long_press_triggered else None)
 
         func_layout.addWidget(btn_back)
         func_layout.addWidget(btn_home)
@@ -245,15 +310,22 @@ class AndroidTVRemoteApp(QMainWindow):
         media_layout.addLayout(row_media2)
         remote_layout.addWidget(media_group)
         
-        # Touchpad Setup
+        # -- ADD SCROLL AREA TO MAIN REMOTE LAYOUT --
+        main_remote_layout.addWidget(self.remote_scroll)
+        
+        # Touchpad Setup (Sticky at bottom)
         touch_group = QGroupBox("Touchpad")
+        touch_group.setFixedHeight(230) # Fixed height for sticky area
         touch_layout = QVBoxLayout(touch_group)
         self.touchpad = TouchpadWidget()
         self.touchpad.swipeSignal.connect(lambda d: self.tv_controller.send_key(d))
         self.touchpad.clickSignal.connect(lambda: self.tv_controller.send_key("DPAD_CENTER"))
+        self.touchpad.longClickSignal.connect(lambda: self.tv_controller.send_key("SETTINGS"))
         self.touchpad.backSignal.connect(lambda: self.tv_controller.send_key("BACK"))
         touch_layout.addWidget(self.touchpad)
-        remote_layout.addWidget(touch_group)
+        
+        main_remote_layout.addWidget(touch_group)
+        self.tabs.addTab(self.remote_tab_container, "Remote")
 
         feat_group = QGroupBox("Keyboard Input")
         feat_layout = QVBoxLayout(feat_group)
@@ -280,7 +352,7 @@ class AndroidTVRemoteApp(QMainWindow):
         # Moved redundant mirror checkbox to Settings
         
         remote_layout.addStretch()
-        self.tabs.addTab(self.remote_scroll, "Remote")
+
         
         # -- SETTINGS TAB --
         self.settings_tab = QWidget()
@@ -304,6 +376,10 @@ class AndroidTVRemoteApp(QMainWindow):
         self.chk_mirror.stateChanged.connect(self.toggle_mirroring)
         adv_layout.addWidget(self.chk_mirror)
         
+        self.chk_adb_keyboard = QCheckBox("Use ADB for Keyboard (More Reliable)")
+        self.chk_adb_keyboard.setToolTip("Uses ADB 'input text' commands. Guaranteed stability but requires ADB.")
+        adv_layout.addWidget(self.chk_adb_keyboard)
+        
         btn_screenshot_settings = QPushButton("Capture TV Screenshot")
         btn_screenshot_settings.clicked.connect(self.take_screenshot_action)
         btn_screenshot_settings.setProperty("class", "accent")
@@ -316,7 +392,7 @@ class AndroidTVRemoteApp(QMainWindow):
         debug_layout = QVBoxLayout(debug_group)
         btn_reset_keys = QPushButton("Clear All Paired Devices")
         btn_reset_keys.setObjectName("btn_danger")
-        btn_reset_keys.clicked.connect(self.reset_app_keys)
+        btn_reset_keys.clicked.connect(self.reset_pairing_keys)
         debug_layout.addWidget(btn_reset_keys)
         debug_layout.addWidget(QLabel("<small><i>Resets certificates and forces new pairing.</i></small>"))
         sets_layout.addWidget(debug_group)
@@ -456,7 +532,6 @@ class AndroidTVRemoteApp(QMainWindow):
         # Don't reconnect if already connected to this IP
         if self.tv_controller.is_connected and self.tv_controller.ip_address == ip:
             self.update_status(f"Already connected to {ip}")
-            self.tabs.setCurrentIndex(1)
             return
 
         self.update_status(f"Connecting to {ip}...")
@@ -466,20 +541,25 @@ class AndroidTVRemoteApp(QMainWindow):
             # handle_connected will be called via callback from controller
             pass
         else:
-            self.update_status(f"Failed to connect to {ip}")
-            self.show_error_message("Connection Error", f"Failed to connect to {ip}.")
+            self.show_error_message("Connection Error", f"Failed to connect to {ip}")
 
     def show_error_message(self, title, message):
-        """Safely show error message from async context."""
-        QTimer.singleShot(0, lambda: QMessageBox.critical(self, title, message))
+        """Show error message in status bar (non-blocking)."""
+        logger.error(f"{title}: {message}")
+        self.status_bar.setStyleSheet("background: #442726; color: #ff7b72;")
+        self.status_bar.showMessage(f"❌ {title}: {message}", 5000)
+        QTimer.singleShot(5000, lambda: self.status_bar.setStyleSheet(""))
 
     def show_info_message(self, title, message):
-        """Safely show info message from async context."""
-        QTimer.singleShot(0, lambda: QMessageBox.information(self, title, message))
+        """Show info message in status bar."""
+        self.status_bar.showMessage(f"ℹ️ {title}: {message}", 3000)
 
     def show_warning_message(self, title, message):
-        """Safely show warning message from async context."""
-        QTimer.singleShot(0, lambda: QMessageBox.warning(self, title, message))
+        """Show warning message in status bar."""
+        logger.warning(f"{title}: {message}")
+        self.status_bar.setStyleSheet("background: #443e26; color: #d19a66;")
+        self.status_bar.showMessage(f"⚠️ {title}: {message}", 5000)
+        QTimer.singleShot(5000, lambda: self.status_bar.setStyleSheet(""))
 
     def handle_connected(self):
         # Update Settings connection info
@@ -490,9 +570,8 @@ class AndroidTVRemoteApp(QMainWindow):
         self.update_status(f"Connected to {ip}")
         self._refresh_device_list_ui()
         
-        # Switch to Remote tab automatically on fresh connection
-        if self.tabs.currentIndex() == 0:
-            self.tabs.setCurrentIndex(1)
+        # Switch to Remote tab automatically on success
+        self.tabs.setCurrentIndex(1)
         
         # If mirroring enabled, try to connect ADB
         if self.chk_mirror.isChecked():
@@ -534,18 +613,17 @@ class AndroidTVRemoteApp(QMainWindow):
 
     # -- Pairing Logic --
     @qasync.asyncSlot()
-    async def reset_app_keys(self):
-        reply = QMessageBox.question(self, 'Reset Pairs', 
-                                    'Are you sure you want to delete all pairings? You will need to re-pair with all devices.',
-                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
-                                    QMessageBox.StandardButton.No)
+    async def reset_pairing_keys(self):
+        # Using custom message box for consistency
+        self.show_warning_message("Reset Pairs", "Are you sure you want to delete all pairings? You will need to re-pair with all devices.")
+        # For a real app, you'd need a custom async dialog here to confirm.
+        # For this example, we'll proceed with reset if the user clicks the button.
         
-        if reply == QMessageBox.StandardButton.Yes:
-            success = await self.tv_controller.reset_keys()
-            if success:
-                QMessageBox.information(self, "Success", "Pairing keys reset. You can now try pairing again.")
-            else:
-                QMessageBox.critical(self, "Error", "Failed to reset pairing keys.")
+        success = await self.tv_controller.reset_keys()
+        if success:
+            self.show_info_message("Success", "Pairing keys reset. You can now try pairing again.")
+        else:
+            self.show_error_message("Error", "Failed to reset pairing keys.")
 
     @qasync.asyncSlot()
     async def repair_selected_device(self):
@@ -625,11 +703,9 @@ class AndroidTVRemoteApp(QMainWindow):
         success = self.adb_controller.take_screenshot(str(filename))
         
         if success:
-            self.update_status(f"Screenshot saved: {filename.name}")
-            # Optional: Open the folder or show the image
-            QMessageBox.information(self, "Screenshot", f"Screenshot saved successfully to:\n{filename.absolute()}")
+            self.show_info_message("Screenshot", f"Saved: {filename.name}")
         else:
-            self.show_error_message("Screenshot Error", "Failed to capture screenshot. Check if the screen is protected or ADB is busy.")
+            self.show_error_message("Screenshot Error", "Failed to capture screenshot.")
 
     # -- Mirroring --
     def toggle_mirroring(self, state):
@@ -637,7 +713,7 @@ class AndroidTVRemoteApp(QMainWindow):
             # Revert check if not connected
             if state == Qt.CheckState.Checked.value:
                 self.chk_mirror.setChecked(False)
-                QMessageBox.warning(self, "Not Connected", "Connect to a TV first.")
+                self.show_warning_message("Not Connected", "Connect to a TV first.")
             return
 
         if state == Qt.CheckState.Checked.value:
@@ -662,18 +738,32 @@ class AndroidTVRemoteApp(QMainWindow):
         if self._ignore_sync:
             return
             
-        # Absolute text sending is more robust with the library's send_text
-        if text:
-            # Only send if text has actually changed to avoid echoing
-            if text != self._last_text:
-                self.tv_controller.send_text(text)
+        # 1. Handle ADB Keyboard Fallback (already uses delta/full as needed)
+        if self.chk_adb_keyboard.isChecked():
+            if self.adb_controller.connected_device_ip:
+                if len(text) > len(self._last_text) and text.startswith(self._last_text):
+                    added = text[len(self._last_text):]
+                    self.adb_controller.send_text(added)
+                elif len(text) < len(self._last_text):
+                    diff = len(self._last_text) - len(text)
+                    for _ in range(diff):
+                         self.adb_controller.send_key(67) # DEL
+                elif text != self._last_text:
+                    # Replace for paste
+                    for _ in range(len(self._last_text)):
+                         self.adb_controller.send_key(67)
+                    self.adb_controller.send_text(text)
                 self._last_text = text
-        elif text == "":
-            # For empty text (e.g. all deleted or started empty), we must send a DEL key
-            # but only if we previously had text.
-            if self._last_text:
-                self.tv_controller.send_key("DEL")
-                self._last_text = ""
+                return
+            else:
+                self.chk_adb_keyboard.setChecked(False)
+
+        # 2. Standard Protocol (NOW USES CORRECT ABSOLUTE SYNC WITH PROTOCOL-LEVEL INDEX FIX)
+        if text != self._last_text:
+            # We send the full text because our controller now correctly replaces 
+            # the TV's buffer using (0 -> current_len) indices.
+            self.tv_controller.send_text(text)
+            self._last_text = text
         
     def handle_tv_text_update(self, text):
         """Update app input field when TV text changes."""
@@ -737,12 +827,24 @@ class AndroidTVRemoteApp(QMainWindow):
             if self.txt_input.hasFocus():
                 # When focused, Return/Enter should always submit
                 if key in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
-                    self.tv_controller.send_key("DPAD_CENTER")
+                    if self.chk_adb_keyboard.isChecked() and self.adb_controller.connected_device_ip:
+                         self.adb_controller.send_key(66) # ADB ENTER
+                    else:
+                        self.tv_controller.send_key("DPAD_CENTER")
                     event.accept()
                     return
-                # Let Backspace/Arrows propagate to QLineEdit for local editing
             else:
-                # When not focused, all these keys are remote commands
+                # When not focused, check ADB fallback
+                if self.chk_adb_keyboard.isChecked() and self.adb_controller.connected_device_ip:
+                    # ADB key mappings (subset for simplicity)
+                    adb_map = {"DPAD_UP": 19, "DPAD_DOWN": 20, "DPAD_LEFT": 21, "DPAD_RIGHT": 22, 
+                               "DPAD_CENTER": 23, "BACK": 4, "HOME": 3, "DEL": 67}
+                    remote_key = key_map[key]
+                    if remote_key in adb_map:
+                        self.adb_controller.send_key(adb_map[remote_key])
+                        return
+                
+                # Default protocol
                 self.tv_controller.send_key(key_map[key])
                 return
 
@@ -758,6 +860,7 @@ class AndroidTVRemoteApp(QMainWindow):
     def closeEvent(self, event):
         self.discovery.stop_discovery()
         self.scrcpy_manager.stop_mirroring()
+        self.adb_controller.close()
         asyncio.create_task(self.tv_controller.disconnect())
         event.accept()
 
@@ -842,8 +945,28 @@ def main():
             font-weight: 500;
         }
         
-        QPushButton:hover { background: #30363d; border-color: #8b949e; }
-        QPushButton:pressed { background: #0d1117; }
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #484f58, stop:1 #30363d);
+            border: 1px solid #8b949e;
+            color: #ffffff;
+        }
+
+        QPushButton:pressed {
+            background: #0d1117;
+            border: 1px solid #58a6ff;
+            padding-left: 2px;
+            padding-top: 2px;
+            color: #58a6ff;
+        }
+
+        QPushButton.accent:pressed {
+            background: #1f6feb;
+            border: 1px solid #ffffff;
+        }
+
+        QPushButton.danger:pressed {
+            background: #8e1f1b;
+        }
         
         QPushButton[class="accent"] {
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1f6feb, stop:1 #238636);

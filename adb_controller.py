@@ -14,6 +14,7 @@ class ADBController:
     def __init__(self):
         self.adb_path = cfg.get("adb_path", "adb")
         self.connected_device_ip: Optional[str] = None
+        self._shell_process: Optional[subprocess.Popen] = None
     
     def _run_command(self, cmd_args: List[str]) -> tuple[bool, str]:
         """Run an ADB command."""
@@ -35,15 +36,49 @@ class ADBController:
 
     def connect(self, ip_address: str) -> bool:
         """Connect to device via ADB TCP/IP."""
-        # 5555 is default TCPIP port
         logger.info(f"ADB connecting to {ip_address}...")
         success, output = self._run_command(["connect", f"{ip_address}:5555"])
         
-        # Output usually: "connected to x.x.x.x:5555" or "already connected"
-        if success and ("connected" in output):
+        if success and ("connected" in output or "already" in output):
             self.connected_device_ip = ip_address
+            # Pre-start persistent shell for fast input
+            self._ensure_shell()
             return True
         return False
+
+    def _ensure_shell(self):
+        """Ensure a persistent shell is running for fast input."""
+        if not self.connected_device_ip:
+            return
+            
+        if self._shell_process and self._shell_process.poll() is None:
+            return # Already running
+            
+        try:
+            logger.info("Starting persistent ADB shell process...")
+            cmd = [self.adb_path, "-s", f"{self.connected_device_ip}:5555", "shell"]
+            self._shell_process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1 # Line buffered
+            )
+        except Exception as e:
+            logger.error(f"Failed to start persistent shell: {e}")
+
+    def close(self):
+        """Closes the persistent shell process."""
+        if self._shell_process:
+            try:
+                self._shell_process.stdin.write("exit\n")
+                self._shell_process.stdin.flush()
+                self._shell_process.terminate()
+                self._shell_process.wait(timeout=1)
+            except:
+                pass
+            self._shell_process = None
 
     def is_available(self) -> bool:
         """Check if ADB tool is available."""
@@ -100,4 +135,42 @@ class ADBController:
         ])
         
         return success
+
+    def send_text(self, text: str) -> bool:
+        """Send text using high-speed persistent shell."""
+        if not self.connected_device_ip:
+            return False
+        
+        self._ensure_shell()
+        if not self._shell_process:
+            return False
+            
+        try:
+            # Persistent shell is much faster as it avoids spawning process per letter
+            escaped_text = text.replace(" ", "%s").replace("'", "\\'")
+            self._shell_process.stdin.write(f"input text '{escaped_text}'\n")
+            self._shell_process.stdin.flush()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send text via persistent shell: {e}")
+            self._shell_process = None # Force restart on next call
+            return False
+
+    def send_key(self, keycode: int) -> bool:
+        """Send keyevent using high-speed persistent shell."""
+        if not self.connected_device_ip:
+            return False
+            
+        self._ensure_shell()
+        if not self._shell_process:
+            return False
+            
+        try:
+            self._shell_process.stdin.write(f"input keyevent {keycode}\n")
+            self._shell_process.stdin.flush()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send key via persistent shell: {e}")
+            self._shell_process = None
+            return False
 
