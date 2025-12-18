@@ -1,5 +1,7 @@
 from zeroconf import Zeroconf, ServiceBrowser, ServiceStateChange
 import threading
+# Copyright (c) 2025 Rex Ackermann. All rights reserved.
+# Licensed under the MIT License.
 import socket
 import logging
 from typing import Callable, Dict

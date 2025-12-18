@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Rex Ackermann. All rights reserved.
+# Licensed under the MIT License.
 import asyncio
 import logging
 from pathlib import Path

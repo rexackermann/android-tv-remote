@@ -1,0 +1,37 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+
+# sensitive data
+*.pem
+*.json
+!android-tv-remote.desktop
+!requirements.txt
+!pyproject.toml
+
+# config folder artifacts (if user ran from source)
+.config/
+config.json
+
+# Logs
+*.log

@@ -1,3 +1,5 @@
+# Copyright (c) 2025 Rex Ackermann. All rights reserved.
+# Licensed under the MIT License.
 import sys
 import time
 import asyncio

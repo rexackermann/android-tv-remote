@@ -44,16 +44,15 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 
-# Activate and Install
+# Activate and Install Local Package
 source venv/bin/activate
-echo "⬇️  Installing Python dependencies..."
-pip install -r requirements.txt --upgrade
+echo "⬇️  Installing Android TV Remote and dependencies..."
+pip install -e . --upgrade
 
 # Create Desktop Entry
 echo "📝 Creating desktop entry..."
 PWD=$(pwd)
-ICON_PATH="$PWD/assets/icon.png" # You'll need to add an icon later
-EXEC_PATH="$PWD/venv/bin/python $PWD/tv_remote_app.py"
+EXEC_PATH="$PWD/venv/bin/android-tv-remote"
 
 cat > android-tv-remote.desktop << EOL
 [Desktop Entry]

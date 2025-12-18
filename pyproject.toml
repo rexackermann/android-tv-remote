@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "android-tv-remote"
+version = "1.0.0"
+authors = [
+  { name="Rex Ackermann" },
+]
+description = "A premium Android TV Remote application for Linux with touch support and screen mirroring."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "PyQt6",
+    "qasync",
+    "androidtvremote2",
+    "zeroconf",
+    "cryptography",
+    "adbutils"
+]
+
+[project.scripts]
+android-tv-remote = "tv_remote_app:main"
+
+[tool.setuptools]
+py-modules = ["tv_remote_app", "android_tv_controller", "device_discovery", "adb_controller", "scrcpy_manager", "touchpad_widget", "config"]

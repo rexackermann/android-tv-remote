@@ -1,4 +1,6 @@
 import logging
+# Copyright (c) 2025 Rex Ackermann. All rights reserved.
+# Licensed under the MIT License.
 import subprocess
 from typing import Optional, List
 from config import cfg
