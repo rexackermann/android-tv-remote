@@ -6,9 +6,9 @@ import qasync
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLabel, QListWidget, 
                             QMessageBox, QInputDialog, QLineEdit, QGroupBox,
-                            QTabWidget, QCheckBox, QStatusBar)
+                            QTabWidget, QCheckBox, QStatusBar, QScrollArea, QFrame)
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot, pyqtSignal
-from PyQt6.QtGui import QIcon, QFont, QKeyEvent, QColor, QBrush
+from PyQt6.QtGui import QIcon, QFont, QKeyEvent, QColor, QBrush, QLinearGradient
 
 from config import cfg
 from android_tv_controller import AndroidTVController
@@ -105,9 +105,19 @@ class AndroidTVRemoteApp(QMainWindow):
         
         self.tabs.addTab(self.devices_tab, "Devices")
         
-        # -- REMOTE TAB --
+        # -- REMOTE TAB (Wrapped in ScrollArea) --
+        self.remote_scroll = QScrollArea()
+        self.remote_scroll.setWidgetResizable(True)
+        self.remote_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.remote_scroll.setStyleSheet("background: transparent;")
+        
         self.remote_tab = QWidget()
+        self.remote_tab.setObjectName("remote_tab")
+        self.remote_scroll.setWidget(self.remote_tab)
+        
         remote_layout = QVBoxLayout(self.remote_tab)
+        remote_layout.setContentsMargins(10, 10, 10, 10)
+        remote_layout.setSpacing(15)
         
         # D-pad Config
         nav_group = QGroupBox("Navigation")
@@ -265,61 +275,53 @@ class AndroidTVRemoteApp(QMainWindow):
         input_sub.addWidget(self.txt_input)
         feat_layout.addLayout(input_sub)
 
-        extra_btn_layout = QHBoxLayout()
-        self.chk_mirror_remote = QCheckBox("Mirror Screen")
-        self.chk_mirror_remote.stateChanged.connect(self.toggle_mirroring)
+        # Screen Mirroring & Feature Removal
+        # Moved redundant mirror checkbox to Settings
         
-        btn_screenshot = QPushButton("Capture Screenshot")
-        btn_screenshot.clicked.connect(self.take_screenshot_action)
-        btn_screenshot.setProperty("class", "accent")
-        
-        extra_btn_layout.addWidget(self.chk_mirror_remote)
-        extra_btn_layout.addWidget(btn_screenshot)
-        feat_layout.addLayout(extra_btn_layout)
-        
-        remote_layout.addWidget(feat_group)
-        remote_layout.addSpacing(10)
-        
-        self.tabs.addTab(self.remote_tab, "Remote")
+        remote_layout.addStretch()
+        self.tabs.addTab(self.remote_scroll, "Remote")
         
         # -- SETTINGS TAB --
         self.settings_tab = QWidget()
         sets_layout = QVBoxLayout(self.settings_tab)
+        sets_layout.setContentsMargins(20, 20, 20, 20)
+        sets_layout.setSpacing(20)
         
-        # Screen Mirroring Toggle
-        mirror_group = QGroupBox("Screen Mirroring (Requires ADB)")
-        mirror_layout = QVBoxLayout(mirror_group)
-        self.chk_mirror = QCheckBox("Enable Mirroring (PC <- TV)")
-        self.chk_mirror.stateChanged.connect(self.toggle_mirroring)
-        mirror_layout.addWidget(self.chk_mirror)
-        mirror_layout.addWidget(QLabel("<i>Note: This requires ADB Debugging enabled on TV.</i>"))
-        sets_layout.addWidget(mirror_group)
+        # Connection Status / Info
+        info_group = QGroupBox("Active Connection")
+        info_layout = QVBoxLayout(info_group)
+        self.lbl_conn_info = QLabel("No device connected")
+        self.lbl_conn_info.setStyleSheet("color: #8b949e;")
+        info_layout.addWidget(self.lbl_conn_info)
+        sets_layout.addWidget(info_group)
         
-        # Keyboard Input
-        input_group = QGroupBox("Keyboard Input")
-        input_layout = QVBoxLayout(input_group)
-        self.txt_input = QLineEdit()
-        self.txt_input.setPlaceholderText("Type text to send to TV...")
-        self.txt_input.returnPressed.connect(self.send_text_input)
-        btn_send_text = QPushButton("Send Text")
-        btn_send_text.clicked.connect(self.send_text_input)
-        input_layout.addWidget(self.txt_input)
-        input_layout.addWidget(btn_send_text)
-        sets_layout.addWidget(input_group)
+        # Mirroring & Advanced
+        adv_group = QGroupBox("Advanced Features")
+        adv_layout = QVBoxLayout(adv_group)
         
-        # Troubleshooting Group
+        self.chk_mirror_settings = QCheckBox("Enable Screen Mirroring (Requires ADB)")
+        self.chk_mirror_settings.stateChanged.connect(self.toggle_mirroring)
+        adv_layout.addWidget(self.chk_mirror_settings)
+        
+        btn_screenshot_settings = QPushButton("Capture TV Screenshot")
+        btn_screenshot_settings.clicked.connect(self.take_screenshot_action)
+        btn_screenshot_settings.setProperty("class", "accent")
+        adv_layout.addWidget(btn_screenshot_settings)
+        
+        sets_layout.addWidget(adv_group)
+        
+        # Troubleshooting
         debug_group = QGroupBox("Troubleshooting")
         debug_layout = QVBoxLayout(debug_group)
-        btn_reset_keys = QPushButton("Reset App Pairs (Unpair Everything)")
-        btn_reset_keys.setStyleSheet("color: #FF5555;")
+        btn_reset_keys = QPushButton("Clear All Paired Devices")
+        btn_reset_keys.setObjectName("btn_danger")
         btn_reset_keys.clicked.connect(self.reset_app_keys)
         debug_layout.addWidget(btn_reset_keys)
-        debug_layout.addWidget(QLabel("<i>Note: This deletes local certificates. You will need to re-pair with all TVs.</i>"))
-        
+        debug_layout.addWidget(QLabel("<small><i>Resets certificates and forces new pairing.</i></small>"))
         sets_layout.addWidget(debug_group)
         
         sets_layout.addStretch()
-        self.tabs.addTab(self.settings_tab, "Features")
+        self.tabs.addTab(self.settings_tab, "Settings")
 
     def setup_callbacks(self):
         self.tv_controller.on_connect_callback = self.handle_connected
@@ -735,46 +737,59 @@ def main():
     
     # Modern Premium Dark Theme Stylesheet
     app.setStyleSheet("""
-        QMainWindow, QWidget {
-            background-color: #0f1215;
-            color: #f0f0f0;
+        QMainWindow, QWidget#devices_tab, QWidget#settings_tab {
+            background-color: #0d1117;
+            color: #c9d1d9;
             font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
             font-size: 14px;
         }
         
+        /* ScrollArea Styling */
+        QScrollArea { border: none; background: transparent; }
+        QScrollBar:vertical {
+            border: none;
+            background: #0d1117;
+            width: 8px;
+            margin: 0px;
+        }
+        QScrollBar::handle:vertical {
+            background: #30363d;
+            min-height: 20px;
+            border-radius: 4px;
+        }
+        QScrollBar::handle:vertical:hover { background: #484f58; }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+        
         QTabWidget::pane { 
             border: none;
-            background: #161b22;
-            border-radius: 12px;
-            margin-top: -1px;
-        }
-        
-        QTabWidget::tab-bar {
-            alignment: center;
+            background: #0d1117;
+            border-top: 1px solid #30363d;
         }
         
         QTabBar::tab {
-            background: #1c2128;
+            background: #161b22;
             color: #8b949e;
-            padding: 12px 24px;
-            border-top-left-radius: 12px;
-            border-top-right-radius: 12px;
-            margin-right: 4px;
-            min-width: 100px;
+            padding: 10px 20px;
+            border: 1px solid #30363d;
+            border-bottom: none;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            margin-right: 2px;
+            min-width: 80px;
         }
         
         QTabBar::tab:selected {
-            background: #21262d;
-            color: #ffffff;
-            border-bottom: 3px solid #58a6ff;
+            background: #0d1117;
+            color: #58a6ff;
+            border-bottom: 2px solid #58a6ff;
         }
         
         QGroupBox {
-            background: rgba(33, 38, 45, 0.4);
+            background: rgba(22, 27, 34, 0.4);
             border: 1px solid #30363d;
             border-radius: 12px;
             margin-top: 20px;
-            padding-top: 24px;
+            padding-top: 15px;
             font-weight: bold;
             color: #58a6ff;
         }
@@ -786,30 +801,21 @@ def main():
         }
         
         QPushButton {
-            background: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 #21262d, stop:1 #1c2128);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #21262d, stop:1 #161b22);
             border: 1px solid #30363d;
             border-radius: 8px;
-            padding: 8px 16px;
+            padding: 10px;
             color: #c9d1d9;
-            min-height: 32px;
+            font-weight: 500;
         }
         
-        QPushButton:hover {
-            background: #30363d;
-            border-color: #8b949e;
-        }
-        
-        QPushButton:pressed {
-            background: #0d1117;
-            padding-top: 10px;
-            padding-bottom: 6px;
-        }
+        QPushButton:hover { background: #30363d; border-color: #8b949e; }
+        QPushButton:pressed { background: #0d1117; }
         
         QPushButton[class="accent"] {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1f6feb, stop:1 #238636);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1f6feb, stop:1 #238636);
             color: white;
             border: none;
-            font-weight: bold;
         }
         
         QPushButton#btn_center {
@@ -818,49 +824,43 @@ def main():
         }
         
         QPushButton#btn_power {
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #da3633, stop:1 #8e2a27);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #da3633, stop:1 #8e2a27);
             color: white;
             border: none;
-            font-weight: bold;
         }
         
+        QPushButton#btn_danger {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid #f85149;
+            color: #f85149;
+        }
+        QPushButton#btn_danger:hover { background: #f85149; color: white; }
+        
         QLineEdit {
-            background: #0d1117;
+            background: #010409;
             border: 1px solid #30363d;
             border-radius: 8px;
-            padding: 10px;
+            padding: 12px;
             color: #f0f0f0;
             font-size: 15px;
             selection-background-color: #58a6ff;
         }
-        
-        QLineEdit:focus {
-            border-color: #58a6ff;
-        }
+        QLineEdit:focus { border-color: #58a6ff; }
         
         QListWidget {
             background: #0d1117;
             border: 1px solid #30363d;
             border-radius: 8px;
             padding: 4px;
+            outline: none;
         }
+        QListWidget::item { padding: 10px; border-radius: 6px; }
+        QListWidget::item:selected { background: #1f6feb; color: white; }
         
-        QListWidget::item {
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 2px;
-        }
+        QCheckBox { spacing: 8px; color: #8b949e; }
+        QCheckBox::indicator { width: 18px; height: 18px; }
         
-        QListWidget::item:selected {
-            background: #1f6feb;
-            color: white;
-        }
-        
-        QStatusBar {
-            background: #010409;
-            color: #8b949e;
-            border-top: 1px solid #30363d;
-        }
+        QStatusBar { background: #010409; color: #8b949e; border-top: 1px solid #30363d; }
     """)
     
     loop = qasync.QEventLoop(app)
