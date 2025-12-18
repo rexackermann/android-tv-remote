@@ -132,7 +132,7 @@ Go to the **Settings** tab to enable advanced features.
 **MIT License** © 2025 **Rex Ackermann**
 
 *   **Privacy First**: This application is strictly local. It communicates directly with your TV over LAN. No data is sent to the cloud.
-*   **Clean Repo**: No personal keys are stored in this codebase. Your local keys live in `~/.config/android-tv-remote/`.
+
 
 <div align="center">
   <i>Built with ❤️ using Python & PyQt6</i>
