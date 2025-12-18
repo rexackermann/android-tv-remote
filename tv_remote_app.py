@@ -274,6 +274,10 @@ class AndroidTVRemoteApp(QMainWindow):
         # UI Polish: buttons removed as requested
         input_sub.addWidget(self.txt_input)
         feat_layout.addLayout(input_sub)
+        
+        # FIX: ADD THE GROUP TO THE LAYOUT (WAS MISSING)
+        remote_layout.addWidget(feat_group)
+        remote_layout.addSpacing(10)
 
         # Screen Mirroring & Feature Removal
         # Moved redundant mirror checkbox to Settings
@@ -299,9 +303,9 @@ class AndroidTVRemoteApp(QMainWindow):
         adv_group = QGroupBox("Advanced Features")
         adv_layout = QVBoxLayout(adv_group)
         
-        self.chk_mirror_settings = QCheckBox("Enable Screen Mirroring (Requires ADB)")
-        self.chk_mirror_settings.stateChanged.connect(self.toggle_mirroring)
-        adv_layout.addWidget(self.chk_mirror_settings)
+        self.chk_mirror = QCheckBox("Enable Screen Mirroring (Requires ADB)")
+        self.chk_mirror.stateChanged.connect(self.toggle_mirroring)
+        adv_layout.addWidget(self.chk_mirror)
         
         btn_screenshot_settings = QPushButton("Capture TV Screenshot")
         btn_screenshot_settings.clicked.connect(self.take_screenshot_action)
@@ -474,6 +478,11 @@ class AndroidTVRemoteApp(QMainWindow):
         self._refresh_device_list_ui()
         self.tabs.setCurrentIndex(1) # Switch to remote tab
         
+        # Update Settings connection info
+        ip = self.tv_controller.ip_address
+        self.lbl_conn_info.setText(f"Connected to: {ip}")
+        self.lbl_conn_info.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        
         # If mirroring enabled, try to connect ADB
         if self.chk_mirror.isChecked():
             self.start_mirroring()
@@ -481,6 +490,8 @@ class AndroidTVRemoteApp(QMainWindow):
     def handle_disconnected(self):
         self.update_status("Disconnected")
         self._refresh_device_list_ui()
+        self.lbl_conn_info.setText("No device connected")
+        self.lbl_conn_info.setStyleSheet("color: #8b949e;")
 
     def _refresh_device_list_ui(self):
         """Update existing list items with latest status colors."""
