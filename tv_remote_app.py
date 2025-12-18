@@ -111,36 +111,31 @@ class AndroidTVRemoteApp(QMainWindow):
         
         # D-pad Config
         dpad_group = QGroupBox("Navigation")
-        dpad_layout = QVBoxLayout(dpad_group) # Grid or box
+        dpad_layout = QVBoxLayout(dpad_group)
         
-        # Simple button grid for navigation
-        nav_layout = QVBoxLayout()
-        row1 = QHBoxLayout()
-        row2 = QHBoxLayout()
-        row3 = QHBoxLayout()
+        from PyQt6.QtWidgets import QGridLayout
+        nav_grid = QGridLayout()
         
         btn_up = QPushButton("▲")
         btn_down = QPushButton("▼")
         btn_left = QPushButton("◀")
         btn_right = QPushButton("▶")
         btn_center = QPushButton("OK")
+        btn_center.setProperty("class", "accent")
         
         for btn in [btn_up, btn_down, btn_left, btn_right, btn_center]:
             btn.setFixedSize(60, 60)
             btn.setFont(QFont("Arial", 16))
             
-        row1.addWidget(btn_up)
-        row2.addWidget(btn_left)
-        row2.addWidget(btn_center)
-        row2.addWidget(btn_right)
-        row3.addWidget(btn_down)
+        nav_grid.addWidget(btn_up, 0, 1)
+        nav_grid.addWidget(btn_left, 1, 0)
+        nav_grid.addWidget(btn_center, 1, 1)
+        nav_grid.addWidget(btn_right, 1, 2)
+        nav_grid.addWidget(btn_down, 2, 1)
         
-        nav_layout.addLayout(row1)
-        nav_layout.addLayout(row2)
-        nav_layout.addLayout(row3)
-        nav_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        dpad_layout.addLayout(nav_layout)
+        container = QWidget()
+        container.setLayout(nav_grid)
+        dpad_layout.addWidget(container, 0, Qt.AlignmentFlag.AlignCenter)
         remote_layout.addWidget(dpad_group)
         
         # Connect buttons
@@ -168,7 +163,7 @@ class AndroidTVRemoteApp(QMainWindow):
         # Power & Channel
         pc_layout = QHBoxLayout()
         btn_power = QPushButton("POWER")
-        btn_power.setStyleSheet("color: #FF5555; font-weight: bold;")
+        btn_power.setObjectName("btn_power") 
         btn_chup = QPushButton("CH +")
         btn_chdown = QPushButton("CH -")
         
@@ -203,15 +198,15 @@ class AndroidTVRemoteApp(QMainWindow):
         
         row_media1 = QHBoxLayout()
         btn_prev = QPushButton("⏮")
-        btn_rew = QPushButton("⏪")
+        btn_rew = QPushButton(" << ")
         btn_play = QPushButton("▶")
         btn_pause = QPushButton("Ⅱ")
-        btn_ff = QPushButton("⏩")
+        btn_ff = QPushButton(" >> ")
         btn_next = QPushButton("⏭")
         
         for btn in [btn_prev, btn_rew, btn_play, btn_pause, btn_ff, btn_next]:
-            btn.setFixedSize(45, 40)
-            btn.setFont(QFont("Arial", 14))
+            btn.setFixedSize(50, 45) # Slightly larger for better touch/click targets
+            btn.setFont(QFont("Inter", 12, QFont.Weight.Bold))
             
         btn_prev.clicked.connect(lambda: self.tv_controller.send_key("MEDIA_PREVIOUS"))
         btn_rew.clicked.connect(lambda: self.tv_controller.send_key("MEDIA_REWIND"))
@@ -229,7 +224,8 @@ class AndroidTVRemoteApp(QMainWindow):
         
         row_media2 = QHBoxLayout()
         btn_stop = QPushButton("⏹ STOP")
-        btn_stop.setFixedHeight(40)
+        btn_stop.setFixedHeight(45)
+        btn_stop.setFont(QFont("Inter", 11, QFont.Weight.DemiBold))
         btn_stop.clicked.connect(lambda: self.tv_controller.send_key("MEDIA_STOP"))
         row_media2.addWidget(btn_stop)
         
@@ -238,16 +234,19 @@ class AndroidTVRemoteApp(QMainWindow):
         remote_layout.addWidget(media_group)
         
         # Touchpad Setup
-        remote_layout.addWidget(QLabel("Touchpad (Tap=OK, RightClick=Back)"))
+        touch_group = QGroupBox("Touchpad")
+        touch_layout = QVBoxLayout(touch_group)
         self.touchpad = TouchpadWidget()
         self.touchpad.swipeSignal.connect(lambda d: self.tv_controller.send_key(d))
         self.touchpad.clickSignal.connect(lambda: self.tv_controller.send_key("DPAD_CENTER"))
         self.touchpad.backSignal.connect(lambda: self.tv_controller.send_key("BACK"))
-        remote_layout.addWidget(self.touchpad)
+        touch_layout.addWidget(self.touchpad)
+        remote_layout.addWidget(touch_group)
 
         # Keyboard & Features (Consolidated)
-        feat_group = QGroupBox("Keyboard & Controls")
+        feat_group = QGroupBox("Keyboard Input")
         feat_layout = QVBoxLayout(feat_group)
+        feat_layout.setContentsMargins(15, 20, 15, 15)
         
         self.chk_keyboard_grab = QCheckBox("Capture PC Keyboard (ESC, Arrows, etc.)")
         self.chk_keyboard_grab.setChecked(True)
@@ -255,26 +254,37 @@ class AndroidTVRemoteApp(QMainWindow):
         
         input_sub = QHBoxLayout()
         self.txt_input = QLineEdit()
-        self.txt_input.setPlaceholderText("Type text to send...")
-        self.txt_input.returnPressed.connect(self.send_text_input)
-        btn_send_text = QPushButton("Send")
-        btn_send_text.clicked.connect(self.send_text_input)
+        self.txt_input.setPlaceholderText("Type real-time to TV...")
+        self.txt_input.textChanged.connect(self.on_realtime_text)
+        self._last_text = "" # For tracking deltas
+        
+        btn_backspace = QPushButton("⌫")
+        btn_backspace.setFixedWidth(50)
+        btn_backspace.clicked.connect(lambda: self.tv_controller.send_key("DEL"))
+        
+        btn_clear_input = QPushButton("Clear")
+        btn_clear_input.setFixedWidth(60)
+        btn_clear_input.clicked.connect(self.clear_realtime_input)
+        
         input_sub.addWidget(self.txt_input)
-        input_sub.addWidget(btn_send_text)
+        input_sub.addWidget(btn_backspace)
+        input_sub.addWidget(btn_clear_input)
         feat_layout.addLayout(input_sub)
 
         extra_btn_layout = QHBoxLayout()
-        self.chk_mirror_remote = QCheckBox("Mirroring")
+        self.chk_mirror_remote = QCheckBox("Mirror Screen")
         self.chk_mirror_remote.stateChanged.connect(self.toggle_mirroring)
         
-        btn_screenshot = QPushButton("Screenshot")
+        btn_screenshot = QPushButton("Capture Screenshot")
         btn_screenshot.clicked.connect(self.take_screenshot_action)
+        btn_screenshot.setProperty("class", "accent")
         
         extra_btn_layout.addWidget(self.chk_mirror_remote)
         extra_btn_layout.addWidget(btn_screenshot)
         feat_layout.addLayout(extra_btn_layout)
         
         remote_layout.addWidget(feat_group)
+        remote_layout.addSpacing(10)
         
         self.tabs.addTab(self.remote_tab, "Remote")
         
@@ -618,11 +628,28 @@ class AndroidTVRemoteApp(QMainWindow):
             self.chk_mirror.setChecked(False)
 
     # -- Keyboard --
+    def on_realtime_text(self, text):
+        # Delta-based text sending
+        if len(text) > len(self._last_text):
+            # Characters added
+            added = text[len(self._last_text):]
+            self.tv_controller.send_text(added)
+        elif len(text) < len(self._last_text):
+            # Characters deleted
+            diff_count = len(self._last_text) - len(text)
+            for _ in range(diff_count):
+                self.tv_controller.send_key("DEL")
+        
+        self._last_text = text
+
+    def clear_realtime_input(self):
+        self.txt_input.clear()
+        self._last_text = ""
+
     def send_text_input(self):
+        # Deprecated by real-time text, but kept for compatibility
         text = self.txt_input.text()
         if text:
-            # This relies on implementing `send_text` in controller
-            # For now, it's a placeholder
             self.tv_controller.send_text(text)
             self.txt_input.clear()
 
@@ -697,48 +724,128 @@ def main():
     )
     app = QApplication(sys.argv)
     
-    # Modern Dark Theme Stylesheet
+    # Modern Premium Dark Theme Stylesheet
     app.setStyleSheet("""
         QMainWindow, QWidget {
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #0f1215;
+            color: #f0f0f0;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            font-size: 14px;
         }
-        QTabWidget::pane { border: 1px solid #333; }
+        
+        QTabWidget::pane { 
+            border: none;
+            background: #161b22;
+            border-radius: 12px;
+            margin-top: -1px;
+        }
+        
+        QTabWidget::tab-bar {
+            alignment: center;
+        }
+        
         QTabBar::tab {
-            background: #252525;
-            padding: 10px 20px;
-            margin-right: 2px;
+            background: #1c2128;
+            color: #8b949e;
+            padding: 12px 24px;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            margin-right: 4px;
+            min-width: 100px;
         }
+        
         QTabBar::tab:selected {
-            background: #3a3a3a;
-            border-bottom: 2px solid #0078d4;
+            background: #21262d;
+            color: #ffffff;
+            border-bottom: 3px solid #58a6ff;
         }
-        QPushButton {
-            background-color: #333;
-            border: 1px solid #444;
-            padding: 8px;
-            border-radius: 4px;
-        }
-        QPushButton:hover { background-color: #444; }
-        QPushButton:pressed { background-color: #555; }
-        QLineEdit {
-            background-color: #252525;
-            border: 1px solid #444;
-            padding: 5px;
-            border-radius: 4px;
-        }
-        QListWidget {
-            background-color: #252525;
-            border: 1px solid #444;
-        }
+        
         QGroupBox {
-            border: 1px solid #333;
-            margin-top: 10px;
+            background: rgba(33, 38, 45, 0.4);
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            margin-top: 20px;
+            padding-top: 24px;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+        
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top center;
+            padding: 0 10px;
+        }
+        
+        QPushButton {
+            background: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 #21262d, stop:1 #1c2128);
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: #c9d1d9;
+            min-height: 32px;
+        }
+        
+        QPushButton:hover {
+            background: #30363d;
+            border-color: #8b949e;
+        }
+        
+        QPushButton:pressed {
+            background: #0d1117;
             padding-top: 10px;
+            padding-bottom: 6px;
+        }
+        
+        QPushButton[class="accent"] {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1f6feb, stop:1 #238636);
+            color: white;
+            border: none;
             font-weight: bold;
         }
-        QStatusBar { background: #111; color: #888; }
+        
+        QPushButton#btn_power {
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #da3633, stop:1 #8e2a27);
+            color: white;
+            border: none;
+            font-weight: bold;
+        }
+        
+        QLineEdit {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 8px;
+            color: #f0f0f0;
+            selection-background-color: #58a6ff;
+        }
+        
+        QLineEdit:focus {
+            border-color: #58a6ff;
+        }
+        
+        QListWidget {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 4px;
+        }
+        
+        QListWidget::item {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 2px;
+        }
+        
+        QListWidget::item:selected {
+            background: #1f6feb;
+            color: white;
+        }
+        
+        QStatusBar {
+            background: #010409;
+            color: #8b949e;
+            border-top: 1px solid #30363d;
+        }
     """)
     
     loop = qasync.QEventLoop(app)

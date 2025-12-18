@@ -14,8 +14,8 @@ class TouchpadWidget(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(200, 200)
-        self.setStyleSheet("background-color: #2D2D2D; border-radius: 10px;")
+        self.setMinimumSize(250, 180)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         
         self.last_pos = None
         self.press_pos = None
@@ -23,24 +23,26 @@ class TouchpadWidget(QWidget):
         self.is_dragging = False
         
         # UX Thresholds
-        self.swipe_threshold = 50
+        self.swipe_threshold = 30
         self.tap_timeout = 0.2  # Seconds
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Draw background
-        painter.setBrush(QBrush(QColor("#353535")))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(self.rect(), 10, 10)
+        # Draw background (Glassy/Dark)
+        painter.setBrush(QBrush(QColor("#1c2128")))
+        painter.setPen(QPen(QColor("#30363d"), 1))
+        painter.drawRoundedRect(self.rect().adjusted(1,1,-1,-1), 12, 12)
         
         # Draw "Touchpad" label in center
-        painter.setPen(QPen(QColor("#808080")))
+        painter.setPen(QPen(QColor("#8b949e")))
         font = painter.font()
-        font.setPointSize(14)
+        font.setFamily("Inter")
+        font.setPointSize(11)
+        font.setWeight(QFont.Weight.Medium)
         painter.setFont(font)
-        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Touchpad Area")
+        painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Touchpad Gestures\n(Swipe to Navigate, Tap to OK)")
 
     def mousePressEvent(self, event):
         self.last_pos = event.pos()
