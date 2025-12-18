@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QWidget, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal, QPointF
-from PyQt6.QtGui import QPainter, QBrush, QColor, QPen
+from PyQt6.QtGui import QPainter, QBrush, QColor, QPen, QFont
 import time
 
 class TouchpadWidget(QWidget):
