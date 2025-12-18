@@ -471,14 +471,17 @@ class AndroidTVRemoteApp(QMainWindow):
         QTimer.singleShot(0, lambda: QMessageBox.warning(self, title, message))
 
     def handle_connected(self):
-        self.update_status("Connected!")
-        self._refresh_device_list_ui()
-        self.tabs.setCurrentIndex(1) # Switch to remote tab
-        
         # Update Settings connection info
         ip = self.tv_controller.ip_address
         self.lbl_conn_info.setText(f"Connected to: {ip}")
         self.lbl_conn_info.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        
+        self.update_status(f"Connected to {ip}")
+        self._refresh_device_list_ui()
+        
+        # Switch to Remote tab automatically on fresh connection
+        if self.tabs.currentIndex() == 0:
+            self.tabs.setCurrentIndex(1)
         
         # If mirroring enabled, try to connect ADB
         if self.chk_mirror.isChecked():
@@ -648,15 +651,15 @@ class AndroidTVRemoteApp(QMainWindow):
         if self._ignore_sync:
             return
             
-        # Delta-based text sending
-        if len(text) > len(self._last_text):
-            # Characters added
-            added = text[len(self._last_text):]
-            self.tv_controller.send_text(added)
-        elif len(text) < len(self._last_text):
-            # Characters deleted
-            diff_count = len(self._last_text) - len(text)
-            for _ in range(diff_count):
+        # Absolute text sending is more robust than delta for this protocol
+        if text:
+            # Avoid sending the exact same text if it was just synced
+            if text != self._last_text:
+                self.tv_controller.send_text(text)
+        else:
+            # For empty text (last backspace), we must send a DEL key
+            # because the library raises ValueError for empty strings.
+            if self._last_text:
                 self.tv_controller.send_key("DEL")
         
         self._last_text = text
@@ -680,7 +683,7 @@ class AndroidTVRemoteApp(QMainWindow):
         key = event.key()
         modifiers = event.modifiers()
         
-        # 1. Global Navigation / Media Keys (Always Captured)
+        # 1. Global Navigation / Media Keys
         key_map = {
             Qt.Key.Key_Up: "DPAD_UP",
             Qt.Key.Key_Down: "DPAD_DOWN",
@@ -706,21 +709,21 @@ class AndroidTVRemoteApp(QMainWindow):
             self.tv_controller.send_key("POWER")
             return
 
-        # Handle navigation keys
+        # Handle global keys
         if key in key_map:
-            # If typing, we only want to intercept 'Enter' to submit/confirm
             if self.txt_input.hasFocus():
+                # When focused, Return/Enter should always submit
                 if key in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
                     self.tv_controller.send_key("DPAD_CENTER")
                     event.accept()
                     return
-                # Otherwise, let QLineEdit handle Arrows, Backspace, etc. (on_realtime_text handles sync)
+                # Let Backspace/Arrows propagate to QLineEdit for local editing
             else:
-                # If not typing, capture all remote keys
+                # When not focused, all these keys are remote commands
                 self.tv_controller.send_key(key_map[key])
                 return
 
-        # 2. Text Input Handling (Only when not focused, as QLineEdit handles its own text)
+        # 2. Direct Text Input (when not focused)
         if not self.txt_input.hasFocus():
             char = event.text()
             if char and char.isprintable():

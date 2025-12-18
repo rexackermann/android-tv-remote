@@ -110,25 +110,22 @@ class AndroidTVController:
                     
                     await self.client.async_connect()
                     
-                    # Optimistic connection state: if async_connect succeeded, the transport is alive.
-                    self.is_connected = True
-                    if self.on_connect_callback:
-                        self.on_connect_callback()
-                    
                     if not wait_for_ready:
+                        self.is_connected = True
+                        if self.on_connect_callback:
+                            self.on_connect_callback()
                         logger.info("Connection established (pairing mode).")
                         return True
                         
                     # Wait for availability signal (handshake completion)
                     try:
                         logger.info(f"Waiting for availability signal (attempt {attempt})...")
-                        # Increased timeout to 15s for very slow TVs or initial pairing sync
                         await asyncio.wait_for(ready_event.wait(), timeout=15.0)
                         logger.info("Connection confirmed available (handshake complete).")
+                        self.is_connected = True
                     except asyncio.TimeoutError:
                         logger.warning(f"Handshake signal delayed on attempt {attempt}. Remote might still work.")
-                        # Don't fail the connection if the remote is working!
-                        # The user reported commands work even during this timeout.
+                        self.is_connected = True # Handshake might be slow but transport is alive
                     
                     self.client.keep_reconnecting()
                     cfg.set("last_connected_device_ip", ip_address)
@@ -136,8 +133,9 @@ class AndroidTVController:
                             
                 except Exception as e:
                     logger.error(f"Connect failed on attempt {attempt}: {e}")
+                    self.is_connected = False
                     if attempt == 1:
-                        await asyncio.sleep(2) # Longer delay before retry
+                        await asyncio.sleep(2)
                         continue
                     if self.on_error_callback:
                         self.on_error_callback(str(e))
