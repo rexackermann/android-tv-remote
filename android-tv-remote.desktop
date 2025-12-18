@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Android TV Remote
+Comment=Control your Android TV
+Exec=/home/rex/Documents/tv-remote/venv/bin/python /home/rex/Documents/tv-remote/tv_remote_app.py
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Utility;Network;

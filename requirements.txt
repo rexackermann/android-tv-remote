@@ -1,0 +1,9 @@
+PyQt6>=6.6.0
+androidtvremote2>=0.0.10
+adb-shell>=0.4.4
+zeroconf>=0.131.0
+cryptography>=42.0.0
+aiofiles>=23.2.1
+protobuf>=4.25.0
+async-timeout>=4.0.3
+qasync>=0.27.1
