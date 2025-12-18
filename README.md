@@ -1,134 +1,137 @@
-# Android TV Remote for Linux
+# Android TV Remote for Desktop
 
-A premium, touch-first Android TV remote control application for Linux desktops. Features kinetic scrolling, multi-dimensional touchpad physics, real-time keyboard input, and screen mirroring.
+<div align="center">
+  <img src="assets/preview_remote.png" alt="Android TV Remote Main UI" width="300" />
+</div>
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Platform: Linux](https://img.shields.io/badge/Platform-Linux-blue.svg)
-![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-green.svg)
+<div align="center">
+  <h3>A Premium, Touch-First Android TV Controller for Linux & Windows</h3>
+  
+  <p>
+    <a href="#installation"><strong>Explore the docs »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/rexackermann/android-tv-remote/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/rexackermann/android-tv-remote/issues">Request Feature</a>
+  </p>
+</div>
 
-## Features
+<div align="center">
 
-- **Wi-Fi Remote Control**: Uses the official Google TV protocol (fast, reliable, no ADB required for basic control).
-- **Physics-Based Touchpad**: "Sticky" touchpad with distance-weighted acceleration and directional reset physics.
-- **Kinetic Scrolling**: Native flick-to-scroll experience for remote buttons.
-- **Smart Keyboard**: Type directly on your TV from your PC (supports real-time sync).
-- **Screen Mirroring**: Integrated low-latency mirroring via `scrcpy`.
-- **Auto-Discovery**: Zero-configuration device finding on your local network.
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)
+![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg?style=flat-square)
+![Platform: Linux](https://img.shields.io/badge/Platform-Linux-green.svg?style=flat-square)
+![Platform: Windows](https://img.shields.io/badge/Platform-Windows-blueviolet.svg?style=flat-square)
 
-## Dependencies
+</div>
 
-Before installing, ensure you have the required system dependencies found on your distribution.
+---
 
-### Fedora
-```bash
-sudo dnf install python3-devel android-tools scrcpy
-```
+## 📸 Gallery
 
-### Ubuntu / Debian
-```bash
-sudo apt install python3-dev android-tools-adb scrcpy
-```
+<div align="center">
+  <img src="assets/preview_devices.png" alt="Devices" width="260" />
+  <img src="assets/preview_remote.png" alt="Remote" width="260" />
+  <img src="assets/preview_settings.png" alt="Settings" width="260" />
+</div>
 
-### Arch Linux
-```bash
-sudo pacman -S python android-tools scrcpy
-```
+## ✨ Features
 
-*> Note: `scrcpy` and `android-tools` are optional but required if you want to use Screen Mirroring.*
+*   **🚀 Zero-Config Connection**: Automatically finds Android TVs on your Wi-Fi using standard Google protocols.
+*   **🏎️ Physics-Based Touchpad**: A heavy, satisfying swipe experience with "Turbo" acceleration and kinetic inertia.
+*   **📜 Kinetic Scrolling**: Flick through lists on your TV with the same smooth physics as your smartphone.
+*   **⌨️ Real-Time Keyboard**: Type on your desktop keyboard and watch it appear instantly on the TV.
+*   **🖥️ Screen Mirroring**: Integrated low-latency casting (via Scrcpy) for viewing your TV on your monitor.
+*   **🌑 Premium Dark UI**: A modern, glass-morphic interface designed for OLED screens and late-night bingeing.
 
-## Installation (System-Wide)
+---
 
-To install the application globally on your system:
+## 📥 Installation
 
-1.  **Clone the repository** (or download source):
+### 🐧 Linux (System-Wide)
+
+The recommended way for Fedora, Ubuntu, Arch, and other Linux distros.
+
+1.  **Install System Dependencies**:
+    *   **Fedora**: `sudo dnf install python3-devel android-tools scrcpy`
+    *   **Ubuntu/Debian**: `sudo apt install python3-dev android-tools-adb scrcpy`
+    *   **Arch**: `sudo pacman -S python android-tools scrcpy`
+
+2.  **Run the Installer**:
     ```bash
     git clone https://github.com/rexackermann/android-tv-remote.git
     cd android-tv-remote
-    ```
-
-2.  **Run the installer**:
-    ```bash
     chmod +x install.sh
     sudo ./install.sh
     ```
 
-This ensures a clean installation to `/opt/android-tv-remote` and creates a global entry point. The source folder can be safely deleted after installation.
+3.  **Launch**:
+    Open your app menu and search for **Android TV Remote** or run `android-tv-remote` in terminal.
 
-## Usage
+---
 
-### Launching
-- **GUI**: Open your application menu and search for **"Android TV Remote"**.
-- **Terminal**: Run `android-tv-remote`.
+### 🪟 Windows
 
-### Controls
-- **Remote Tab**:
-    - **Buttons**: Click or use "Flick" gestures to scroll deeply.
-    - **Touchpad**:
-        - **Tap**: OK / Select.
-        - **Swipe**: Navigate (Up/Down/Left/Right).
-        - **Hold**: "Turbo" repeat mode.
-        - **Pull Further**: Increases scroll speed (Joystick physics).
-        - **Right Click**: Back.
+Run the experience natively on Windows 10/11.
 
-### Settings & Mirroring
-- **Pairing**: Automatically handles pairing codes on first connection.
-- **Mirroring**: Enable in the **Settings** tab. Requires ADB debugging enabled on the TV.
+1.  **Prerequisites**:
+    *   Install **[Python 3.11+](https://www.python.org/downloads/)** (Check "Add Python to PATH" during install).
+    *   Install **[Git for Windows](https://git-scm.com/download/win)**.
+    *   *(Optional)* Install **[ADB & Scrcpy](https://github.com/Genymobile/scrcpy)** for Screen Mirroring.
 
-## Updating
+2.  **Install & Run**:
+    Open PowerShell or Command Prompt:
 
-To update the application to the latest version:
+    ```powershell
+    # Clone the repository
+    git clone https://github.com/rexackermann/android-tv-remote.git
+    cd android-tv-remote
 
-1.  Pull the latest changes:
-    ```bash
-    git pull
-    ```
-2.  Re-run the installer:
-    ```bash
-    sudo ./install.sh
+    # Install Python dependencies
+    pip install -r requirements.txt
+
+    # Run the application
+    python tv_remote_app.py
     ```
 
-## Uninstallation
+> **Pro Tip**: create a shortcut to `pythonw.exe tv_remote_app.py` to run it without the black console window!
 
-To completely remove the application from your system:
+---
 
-```bash
-# 1. Remove application files
-sudo rm -rf /opt/android-tv-remote
+## 🎮 Usage Guide
 
-# 2. Remove binary symlink
-sudo rm /usr/local/bin/android-tv-remote
+### The Touchpad
+The bottom touchpad area is designed for power users.
+*   **Swipe**: Navigation (Up/Down/Left/Right).
+*   **Hold Direction**: Activates "Joystick" mode—the remote repeats the command.
+    *   *Pull Further* = Faster Repeat Speed (Acceleration).
+    *   *Reverse Direction* = Instant flip & reset.
+*   **Tap**: Select / OK.
+*   **Right Click**: Back.
 
-# 3. Remove desktop entry
-sudo rm /usr/share/applications/android-tv-remote.desktop
-```
+### Keyboard & Mirroring
+Go to the **Settings** tab to enable advanced features.
+*   **Enable Mirroring**: Starts a Scrcpy window embedded in the app (or separate, depending on OS).
+*   **Keyboard**: Just start typing! Ensure you are in a text field on the TV.
 
-*> User configuration and keys stored in `~/.config/android-tv-remote/` are preserved. Delete that folder manually if you want a full wipe.*
+---
 
-## Privacy & Data Storage
+## ❓ Troubleshooting
 
-This application respects your privacy.
+*   **Device Not Found**: Ensure both PC and TV are on the same **Wi-Fi 2.4GHz/5GHz** network. Ethernet connections sometimes block multicast discovery.
+*   **Pairing Code Loop**: If the app keeps asking for a code, remove "Linux TV Remote" from your TV's *Settings -> Remotes & Accessories* menu and pair again.
+*   **Mirroring Black Screen**: You must enable **USB Debugging** (ADB) in your Android TV's Developer Options.
 
-- **Repository**: The source code repository is **clean**. It does not store or track any personal IP addresses, certificates, or keys.
-- **Local Config**: All sensitive data (paired device certificates, last connected IP) is stored locally on your machine at:
-    ```
-    ~/.config/android-tv-remote/
-    ```
-- **Network**: The app communicates ONLY with devices on your local network. No data is sent to external cloud servers.
+---
 
-## Troubleshooting
+## 📄 License & Privacy
 
-- **"Device not found"**: Ensure both PC and TV are on the same Wi-Fi. Check firewall settings.
-- **"Pairing Failed"**: Remove any "Linux TV Remote" entries from your TV's *Settings -> Remotes & Accessories* menu and try again.
-- **"Mirroring Failed"**: Running `scrcpy` manually in a terminal often reveals the error (usually unauthorized ADB state).
+**MIT License** © 2025 **Rex Ackermann**
 
-## License
+*   **Privacy First**: This application is strictly local. It communicates directly with your TV over LAN. No data is sent to the cloud.
+*   **Clean Repo**: No personal keys are stored in this codebase. Your local keys live in `~/.config/android-tv-remote/`.
 
-MIT License
-
-Copyright (c) 2025 **Rex Ackermann**
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+<div align="center">
+  <i>Built with ❤️ using Python & PyQt6</i>
+</div>
