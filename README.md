@@ -18,23 +18,25 @@ Control your Android TV from your Linux desktop with keyboard, touchpad, and scr
 - **Ubuntu/Debian**: `sudo apt install python3-dev android-tools-adb scrcpy`
 - *Note: `scrcpy` and `android-tools` are only required if you want Screen Mirroring features.*
 
-### 2. Install
-Run the included installation script:
+### 2. Install (System-Wide)
+Run the included installation script as root:
 
 ```bash
 chmod +x install.sh
-./install.sh
+sudo ./install.sh
 ```
+
+This will:
+- Install the application to `/opt/android-tv-remote`
+- Create a global command `android-tv-remote`
+- Install a desktop entry for your application menu
 
 ## Usage
 
 ### Launching the App
-You can launch the app from your application menu ("Android TV Remote") or via command line:
-
-```bash
-source venv/bin/activate
-python tv_remote_app.py
-```
+Arguments:
+- **Terminal**: Type `android-tv-remote` anywhere.
+- **GUI**: Search for "Android TV Remote" in your application menu.
 
 ### Connecting to a TV
 1. On the **Devices** tab, wait for your TV to appear in the list (or click **Refresh**).
@@ -44,15 +46,16 @@ python tv_remote_app.py
 5. Enter the code in the **Pairing Code** field in the app and click **Verify**.
 
 ### Controls
-- **Remote Tab**: Standard navigation buttons.
-- **Touchpad Area**:
+- **Remote Tab**: Standard navigation buttons with **Kinetic Scrolling**.
+- **Touchpad Area (Sticky)**:
     - **Tap**: OK / Select
-    - **Swipe**: Navigation (Up/Down/Left/Right)
+    - **Swipe**: Navigation (Up/Down/Left/Right) - *Faster swipes accelerate navigation!*
     - **Right Click**: Back
-- **Keyboard**: Go to "Features" tab to send text input.
+    - **Hold**: Continuous repeat (like a joystick)
+- **Settings**: Configure mirroring and keyboard input.
 
 ### Screen Mirroring
-1. Go to the **Features** tab.
+1. Go to the **Settings** tab.
 2. Ensure connection is active.
 3. Check **Enable Mirroring**.
    - *Requirement*: You must have ADB Debugging enabled on your Android TV settings (Developer Options).
@@ -65,3 +68,15 @@ python tv_remote_app.py
     - Verify ADB is installed (`adb version`).
     - Verify Scrcpy is installed (`scrcpy --version`).
     - Check if ADB debugging is enabled on the TV.
+
+## License
+
+MIT License
+
+Copyright (c) 2025 **Rex Ackermann**
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

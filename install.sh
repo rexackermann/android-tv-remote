@@ -1,76 +1,50 @@
 #!/bin/bash
 
-echo "📺 Android TV Remote - Installer"
-echo "==============================="
-
-# Check for Python 3.11+
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is not installed via 'python3'. Please install Python 3.11 or newer."
-    exit 1
+# Ensure running as root
+if [ "$EUID" -ne 0 ]; then
+  echo "❌ Please run as root (sudo ./install.sh)"
+  exit 1
 fi
 
-PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-REQUIRED_VERSION="3.11"
+echo "📺 Android TV Remote - System Installer"
+echo "======================================="
 
-if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then 
-     echo "❌ Python 3.11+ is required. Found version $PYTHON_VERSION"
-     exit 1
-fi
+INSTALL_DIR="/opt/android-tv-remote"
+BIN_DIR="/usr/local/bin"
+DESKTOP_DIR="/usr/share/applications"
 
-echo "✅ Python $PYTHON_VERSION found."
+# clean previous install
+rm -rf "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR"
 
-# Check for optional dependencies
-echo "🔍 Checking optional dependencies..."
+echo "📂 Copying files to $INSTALL_DIR..."
+# Copy current directory contents to install dir, excluding venv/git/etc
+rsync -av --progress . "$INSTALL_DIR" --exclude venv --exclude .git --exclude __pycache__ --exclude .config
 
-if command -v adb &> /dev/null; then
-    echo "✅ ADB found (needed for optional advanced features)."
-else
-    echo "⚠️  ADB not found. Advanced features (Screen Mirroring, App Install) will be disabled."
-    echo "   To install on Fedora: sudo dnf install android-tools"
-    echo "   To install on Ubuntu/Debian: sudo apt install adb"
-fi
+echo "📦 Creating virtual environment in $INSTALL_DIR/venv..."
+python3 -m venv "$INSTALL_DIR/venv"
 
-if command -v scrcpy &> /dev/null; then
-    echo "✅ scrcpy found (needed for Screen Mirroring)."
-else
-    echo "⚠️  scrcpy not found. Screen Mirroring will be disabled."
-    echo "   To install on Fedora: sudo dnf install scrcpy"
-    echo "   To install on Ubuntu/Debian: sudo apt install scrcpy"
-fi
+echo "⬇️  Installing dependencies..."
+"$INSTALL_DIR/venv/bin/pip" install --upgrade pip
+"$INSTALL_DIR/venv/bin/pip" install "$INSTALL_DIR"
 
-# Create Virtual Environment
-if [ ! -d "venv" ]; then
-    echo "📦 Creating virtual environment..."
-    python3 -m venv venv
-fi
+echo "🔗 Creating symlink..."
+ln -sf "$INSTALL_DIR/venv/bin/android-tv-remote" "$BIN_DIR/android-tv-remote"
 
-# Activate and Install Local Package
-source venv/bin/activate
-echo "⬇️  Installing Android TV Remote and dependencies..."
-pip install -e . --upgrade
+echo "📝 Installing desktop entry..."
+# Update desktop file to point to the correct icon if we had one, 
+# for now we stick to system icon 'utilities-terminal' or generic.
+# We need to make sure the Exec path is just the command name since it's in /usr/local/bin
+sed -i 's|^Exec=.*|Exec=android-tv-remote|' android-tv-remote.desktop
 
-# Create Desktop Entry
-echo "📝 Creating desktop entry..."
-PWD=$(pwd)
-EXEC_PATH="$PWD/venv/bin/android-tv-remote"
+cp android-tv-remote.desktop "$DESKTOP_DIR/"
+chmod 644 "$DESKTOP_DIR/android-tv-remote.desktop"
 
-cat > android-tv-remote.desktop << EOL
-[Desktop Entry]
-Name=Android TV Remote
-Comment=Control your Android TV
-Exec=$EXEC_PATH
-Icon=utilities-terminal
-Terminal=false
-Type=Application
-Categories=Utility;Network;
-EOL
-
-chmod +x android-tv-remote.desktop
-
-echo "==============================="
+echo "======================================="
 echo "✅ Installation Complete!"
-echo "🚀 To run the app:"
-echo "   source venv/bin/activate"
-echo "   python tv_remote_app.py"
+echo "   App installed to: $INSTALL_DIR"
+echo "   Command available globally: android-tv-remote"
+echo "   Desktop entry installed."
 echo ""
-echo "Or run the generated desktop file."
+echo "🚀 You can now delete the source folder if you wish."
+
