@@ -75,10 +75,12 @@ The recommended way for Fedora, Ubuntu, Arch, and other Linux distros.
 
 Run the experience natively on Windows 10/11.
 
-1.  **Prerequisites**:
-    *   Install **[Python 3.11+](https://www.python.org/downloads/)** (Check "Add Python to PATH" during install).
-    *   Install **[Git for Windows](https://git-scm.com/download/win)**.
-    *   *(Optional)* Install **[ADB & Scrcpy](https://github.com/Genymobile/scrcpy)** for Screen Mirroring.
+1.  **Prerequisites (One-Line Setup)**:
+    Open PowerShell as Administrator and run:
+    ```powershell
+    winget install Python.Python.3.11 Git.Git Genymobile.Scrcpy
+    ```
+    *(Restart your terminal after installation to update your PATH).*
 
 2.  **Install & Run**:
     Open PowerShell or Command Prompt:
