@@ -691,6 +691,7 @@ class AndroidTVRemoteApp(QMainWindow):
             Qt.Key.Key_Escape: "BACK",
             Qt.Key.Key_Home: "HOME",
             Qt.Key.Key_Menu: "SETTINGS",
+            Qt.Key.Key_Backspace: "DEL",
             Qt.Key.Key_PageUp: "VOLUME_UP",
             Qt.Key.Key_PageDown: "VOLUME_DOWN",
             Qt.Key.Key_Pause: "MEDIA_PLAY_PAUSE",
@@ -705,24 +706,22 @@ class AndroidTVRemoteApp(QMainWindow):
             self.tv_controller.send_key("POWER")
             return
 
-        # Handle navigation keys globally
+        # Handle navigation keys
         if key in key_map:
-            # Special case: If focused on input, Return/Enter should "submit" (DPAD_CENTER)
-            # but other keys like Backspace might be needed by the QLineEdit itself.
-            # However, for TV Remote, usually we want Return to be OK.
-            self.tv_controller.send_key(key_map[key])
-            if self.txt_input.hasFocus() and key in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
-                # Don't let QLineEdit handle Enter
-                event.accept()
-                return
-            
-            # If not focused on text input, we handle the key
-            if not self.txt_input.hasFocus():
+            # If typing, we only want to intercept 'Enter' to submit/confirm
+            if self.txt_input.hasFocus():
+                if key in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
+                    self.tv_controller.send_key("DPAD_CENTER")
+                    event.accept()
+                    return
+                # Otherwise, let QLineEdit handle Arrows, Backspace, etc. (on_realtime_text handles sync)
+            else:
+                # If not typing, capture all remote keys
+                self.tv_controller.send_key(key_map[key])
                 return
 
-        # 2. Text Input Handling
+        # 2. Text Input Handling (Only when not focused, as QLineEdit handles its own text)
         if not self.txt_input.hasFocus():
-            # If not focused on search box, type individual printable characters directly to TV
             char = event.text()
             if char and char.isprintable():
                 self.tv_controller.send_text(char)
