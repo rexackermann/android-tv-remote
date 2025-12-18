@@ -255,14 +255,11 @@ class AndroidTVRemoteApp(QMainWindow):
         touch_layout.addWidget(self.touchpad)
         remote_layout.addWidget(touch_group)
 
-        # Keyboard & Features (Consolidated)
         feat_group = QGroupBox("Keyboard Input")
         feat_layout = QVBoxLayout(feat_group)
         feat_layout.setContentsMargins(15, 20, 15, 15)
         
-        self.chk_keyboard_grab = QCheckBox("Capture PC Keyboard (ESC, Arrows, etc.)")
-        self.chk_keyboard_grab.setChecked(True)
-        feat_layout.addWidget(self.chk_keyboard_grab)
+        # Checkbox removed as it's now focus-aware by default
         
         input_sub = QHBoxLayout()
         self.txt_input = QLineEdit()
@@ -680,14 +677,10 @@ class AndroidTVRemoteApp(QMainWindow):
 
     # -- Keyboard Handling --
     def keyPressEvent(self, event: QKeyEvent):
-        if not self.chk_keyboard_grab.isChecked():
-            super().keyPressEvent(event)
-            return
-
         key = event.key()
         modifiers = event.modifiers()
         
-        # Map common keys to Android TV Remote key strings
+        # 1. Global Navigation / Media Keys (Always Captured)
         key_map = {
             Qt.Key.Key_Up: "DPAD_UP",
             Qt.Key.Key_Down: "DPAD_DOWN",
@@ -696,15 +689,8 @@ class AndroidTVRemoteApp(QMainWindow):
             Qt.Key.Key_Return: "DPAD_CENTER",
             Qt.Key.Key_Enter: "DPAD_CENTER",
             Qt.Key.Key_Escape: "BACK",
-            Qt.Key.Key_Backspace: "BACK",
             Qt.Key.Key_Home: "HOME",
             Qt.Key.Key_Menu: "SETTINGS",
-            Qt.Key.Key_F1: "DPAD_UP",        # Alternative mappings
-            Qt.Key.Key_F2: "DPAD_DOWN",
-            Qt.Key.Key_F3: "DPAD_LEFT",
-            Qt.Key.Key_F4: "DPAD_RIGHT",
-            Qt.Key.Key_F5: "DPAD_CENTER",
-            Qt.Key.Key_F12: "SETTINGS",
             Qt.Key.Key_PageUp: "VOLUME_UP",
             Qt.Key.Key_PageDown: "VOLUME_DOWN",
             Qt.Key.Key_Pause: "MEDIA_PLAY_PAUSE",
@@ -714,18 +700,29 @@ class AndroidTVRemoteApp(QMainWindow):
             Qt.Key.Key_MediaNext: "MEDIA_NEXT",
         }
 
-        # Alt+F4 for Power/Quit app (if imaginable)
+        # Alt+F4 for Power
         if key == Qt.Key.Key_F4 and modifiers & Qt.KeyboardModifier.AltModifier:
             self.tv_controller.send_key("POWER")
             return
 
-        # Handle specific Character Keys if not a special mapping (and not capturing focusing LineEdit)
-        if not self.txt_input.hasFocus():
-            if key in key_map:
-                self.tv_controller.send_key(key_map[key])
+        # Handle navigation keys globally
+        if key in key_map:
+            # Special case: If focused on input, Return/Enter should "submit" (DPAD_CENTER)
+            # but other keys like Backspace might be needed by the QLineEdit itself.
+            # However, for TV Remote, usually we want Return to be OK.
+            self.tv_controller.send_key(key_map[key])
+            if self.txt_input.hasFocus() and key in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
+                # Don't let QLineEdit handle Enter
+                event.accept()
                 return
             
-            # Type individual characters directly if captured
+            # If not focused on text input, we handle the key
+            if not self.txt_input.hasFocus():
+                return
+
+        # 2. Text Input Handling
+        if not self.txt_input.hasFocus():
+            # If not focused on search box, type individual printable characters directly to TV
             char = event.text()
             if char and char.isprintable():
                 self.tv_controller.send_text(char)
