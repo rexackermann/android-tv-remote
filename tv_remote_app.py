@@ -445,18 +445,29 @@ class AndroidTVRemoteApp(QMainWindow):
             asyncio.create_task(self._perform_connect(ip))
 
     async def _perform_connect(self, ip, wait_for_ready=True):
-        # Sanitize IP: extract just the IP if it's malformed (e.g. "1.2.3.4) - Model")
+        # Sanitize IP
         import re
         ip_match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', ip)
-        if ip_match:
-            ip = ip_match.group(1)
+        if not ip_match:
+            self.update_status(f"Invalid IP: {ip}")
+            return
+        ip = ip_match.group(1)
         
-        self.update_status(f"Attempting connection to {ip}...")
-        try:
-            await self.tv_controller.connect(ip, wait_for_ready=wait_for_ready)
-        except Exception as e:
-            self.show_error_message("Connection Error", str(e))
-            self.update_status(f"Connection failed: {e}")
+        # Don't reconnect if already connected to this IP
+        if self.tv_controller.is_connected and self.tv_controller.ip_address == ip:
+            self.update_status(f"Already connected to {ip}")
+            self.tabs.setCurrentIndex(1)
+            return
+
+        self.update_status(f"Connecting to {ip}...")
+        success = await self.tv_controller.connect(ip, wait_for_ready=wait_for_ready)
+        
+        if success:
+            # handle_connected will be called via callback from controller
+            pass
+        else:
+            self.update_status(f"Failed to connect to {ip}")
+            self.show_error_message("Connection Error", f"Failed to connect to {ip}.")
 
     def show_error_message(self, title, message):
         """Safely show error message from async context."""
@@ -651,18 +662,30 @@ class AndroidTVRemoteApp(QMainWindow):
         if self._ignore_sync:
             return
             
-        # Absolute text sending is more robust than delta for this protocol
+        # Absolute text sending is more robust with the library's send_text
         if text:
-            # Avoid sending the exact same text if it was just synced
+            # Only send if text has actually changed to avoid echoing
             if text != self._last_text:
                 self.tv_controller.send_text(text)
-        else:
-            # For empty text (last backspace), we must send a DEL key
-            # because the library raises ValueError for empty strings.
+                self._last_text = text
+        elif text == "":
+            # For empty text (e.g. all deleted or started empty), we must send a DEL key
+            # but only if we previously had text.
             if self._last_text:
                 self.tv_controller.send_key("DEL")
+                self._last_text = ""
         
-        self._last_text = text
+    def handle_tv_text_update(self, text):
+        """Update app input field when TV text changes."""
+        if text == self.txt_input.text():
+            return
+            
+        logger.info(f"Syncing TV text to app: {text}")
+        self._ignore_sync = True
+        self.txt_input.setText(text)
+        self.txt_input.setCursorPosition(len(text))
+        self._last_text = text # Catch up delta
+        self._ignore_sync = False
 
     def clear_realtime_input(self):
         self.txt_input.clear()

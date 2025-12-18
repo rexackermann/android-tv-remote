@@ -110,22 +110,24 @@ class AndroidTVController:
                     
                     await self.client.async_connect()
                     
+                    # Optimistic connection: the transport is up!
+                    self.is_connected = True
+                    if self.on_connect_callback:
+                        self.on_connect_callback()
+                    
                     if not wait_for_ready:
-                        self.is_connected = True
-                        if self.on_connect_callback:
-                            self.on_connect_callback()
-                        logger.info("Connection established (pairing mode).")
+                        logger.info("Connection transport established (pairing/fast mode).")
                         return True
                         
-                    # Wait for availability signal (handshake completion)
+                    # Handshake check (non-blocking for the return)
                     try:
-                        logger.info(f"Waiting for availability signal (attempt {attempt})...")
-                        await asyncio.wait_for(ready_event.wait(), timeout=15.0)
-                        logger.info("Connection confirmed available (handshake complete).")
-                        self.is_connected = True
+                        logger.info(f"Waiting for TV handshake (attempt {attempt})...")
+                        # Some TVs are very slow to send 'available', we'll wait a bit 
+                        # but we won't block the caller if they want to send keys immediately.
+                        await asyncio.wait_for(ready_event.wait(), timeout=5.0)
+                        logger.info("TV handshake complete.")
                     except asyncio.TimeoutError:
-                        logger.warning(f"Handshake signal delayed on attempt {attempt}. Remote might still work.")
-                        self.is_connected = True # Handshake might be slow but transport is alive
+                        logger.warning(f"Handshake slow on attempt {attempt}. Proceeding optimistically.")
                     
                     self.client.keep_reconnecting()
                     cfg.set("last_connected_device_ip", ip_address)
@@ -135,7 +137,7 @@ class AndroidTVController:
                     logger.error(f"Connect failed on attempt {attempt}: {e}")
                     self.is_connected = False
                     if attempt == 1:
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(1)
                         continue
                     if self.on_error_callback:
                         self.on_error_callback(str(e))
